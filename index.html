@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de Frota S&amp;OP</title>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: faixa amarela de marca no topo; premissas à esquerda, painel de decisão à direita; empilha no celular */
+:root{
+  --brand:#FFE600; --brand-ink:#2D3277; --action:#3483FA;
+  --bg:#EDEDED; --surface:#FFFFFF; --surface-2:#F5F6FA; --line:#DCDDE6;
+  --fg:#1F2140; --muted:#5E6178; --grid:#E4E5EC;
+  --ok:#00A650; --warn:#E08A00; --crit:#E3343E;
+  --ok-bg:#E6F7EE; --warn-bg:#FFF3DC; --crit-bg:#FDE9EA; --info-bg:#E8F1FE;
+  --font:"Nunito Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --brand:#FFE600; --brand-ink:#1E2150; --action:#6AA6FF;
+  --bg:#14152A; --surface:#1D1F38; --surface-2:#242745; --line:#34375A;
+  --fg:#ECEDF7; --muted:#A6A9C4; --grid:#2C2F50;
+  --ok:#3DD68C; --warn:#FFB547; --crit:#FF6B73;
+  --ok-bg:#16362A; --warn-bg:#3A2E14; --crit-bg:#3E1E25; --info-bg:#1C2D4D; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --brand:#FFE600; --brand-ink:#1E2150; --action:#6AA6FF;
+  --bg:#14152A; --surface:#1D1F38; --surface-2:#242745; --line:#34375A;
+  --fg:#ECEDF7; --muted:#A6A9C4; --grid:#2C2F50;
+  --ok:#3DD68C; --warn:#FFB547; --crit:#FF6B73;
+  --ok-bg:#16362A; --warn-bg:#3A2E14; --crit-bg:#3E1E25; --info-bg:#1C2D4D; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.5}
+.num,td.n,th.n{font-variant-numeric:tabular-nums}
+.band{background:var(--brand);color:#2D3277}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.band .wrap{padding-block:22px 20px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+.band h1{margin:0;font-size:clamp(22px,3.4vw,30px);font-weight:800;letter-spacing:-.01em;text-wrap:balance;color:#2D3277}
+.band p{margin:4px 0 0;font-size:14px;color:#3A3F7A;max-width:62ch}
+.eyebrow{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;font-weight:700;color:#2D3277;opacity:.8}
+.today{font-family:var(--mono);font-size:13px;background:rgba(45,50,119,.08);padding:6px 10px;border-radius:6px;color:#2D3277}
+
+main.wrap{padding-block:20px 40px;display:grid;grid-template-columns:320px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){main.wrap{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px}
+aside.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);padding:16px;display:grid;gap:18px;max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:900px){aside.panel{position:static;max-height:none}}
+aside h2{margin:0;font-size:16px;font-weight:800}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:8px}
+legend{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--muted);margin-bottom:6px;padding:0}
+.f{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:8px;align-items:center}
+.f label{font-size:13.5px;color:var(--fg)}
+.f small{display:block;color:var(--muted);font-size:11.5px;line-height:1.3}
+input{font:inherit;font-family:var(--mono);font-size:13px;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--fg);text-align:right}
+input:focus-visible,button:focus-visible{outline:2px solid var(--action);outline-offset:2px}
+input.chg{border-color:var(--action);background:var(--info-bg)}
+.fleet{display:grid;grid-template-columns:52px repeat(3,minmax(0,1fr));gap:6px;align-items:center;font-size:12px}
+.fleet .h{color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:right}
+.fleet b{font-size:13px}
+.mixsum{font-size:12px;color:var(--muted)}
+.mixsum.bad{color:var(--crit);font-weight:700}
+button{font:inherit;font-weight:700;font-size:14px;border:0;border-radius:6px;padding:10px 14px;cursor:pointer}
+.btn-primary{background:var(--action);color:#fff}
+.btn-primary:hover{filter:brightness(1.08)}
+
+.content{display:grid;gap:20px;min-width:0}
+section.panel{padding:18px 18px 16px;min-width:0}
+section h2{margin:0 0 4px;font-size:18px;font-weight:800;text-wrap:balance}
+section .lead{margin:0 0 14px;color:var(--muted);font-size:13.5px;max-width:70ch}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{padding:14px;border-radius:8px;background:var(--surface);border:1px solid var(--line);display:grid;gap:2px;align-content:start}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:700}
+.kpi .v{font-size:26px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12.5px;color:var(--muted)}
+.kpi.crit{border-color:var(--crit);box-shadow:inset 4px 0 0 var(--crit)}
+.kpi.crit .v{color:var(--crit)}
+
+.alerts{display:grid;gap:8px}
+.alert{display:grid;grid-template-columns:86px minmax(0,1fr);gap:12px;align-items:start;padding:10px 12px;border-radius:6px;font-size:14px}
+.alert .tag{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:999px;text-align:center;justify-self:start}
+.alert.crit{background:var(--crit-bg)} .alert.crit .tag{background:var(--crit);color:#fff}
+.alert.warn{background:var(--warn-bg)} .alert.warn .tag{background:var(--warn);color:#1F2140}
+.alert.info{background:var(--info-bg)} .alert.info .tag{background:var(--action);color:#fff}
+.alert.ok{background:var(--ok-bg)} .alert.ok .tag{background:var(--ok);color:#fff}
+.alert .when{font-family:var(--mono);font-size:12px;color:var(--muted);display:block}
+@media (max-width:520px){.alert{grid-template-columns:minmax(0,1fr);gap:6px}}
+
+.chart{width:100%;overflow-x:auto}
+.chart svg{display:block;width:100%;min-width:620px;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+tr.hl td{background:var(--info-bg);font-weight:700}
+.pill{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.crit{background:var(--crit-bg);color:var(--crit)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.info{background:var(--info-bg);color:var(--action)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.box{background:var(--surface-2);border-radius:8px;padding:14px;display:grid;gap:6px;min-width:0}
+.box h3{margin:0;font-size:14px;font-weight:800}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px}
+.row span:last-child{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.verdict{margin-top:12px;padding:12px 14px;border-radius:8px;background:var(--brand);color:#2D3277;font-weight:700;font-size:14px}
+td input{width:110px;padding:4px 6px}
+.tag-ex{font-size:11px;font-weight:800;color:var(--warn);text-transform:uppercase;letter-spacing:.06em}
+/* selo pessoal no lugar de logo */
+.seal{display:flex;align-items:center;gap:10px}
+.seal .mono{width:44px;height:44px;border-radius:50%;background:#2D3277;color:var(--brand);display:grid;place-items:center;font-weight:800;font-size:16px;letter-spacing:.02em;flex:none}
+.seal .who{font-size:12.5px;line-height:1.25;color:#2D3277}
+.seal .who b{display:block;font-size:14px}
+/* fluxo didático */
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;position:relative}
+@media (max-width:1000px){.flow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.flow{grid-template-columns:minmax(0,1fr)}}
+.step{background:var(--surface-2);border-radius:8px;padding:14px;display:grid;gap:6px;align-content:start;position:relative;border-top:4px solid var(--action)}
+.step:nth-child(4){border-top-color:var(--brand)}
+.step .n{width:26px;height:26px;border-radius:50%;background:var(--action);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center}
+.step:nth-child(4) .n{background:var(--brand);color:#2D3277}
+.step h3{margin:0;font-size:15px;font-weight:800}
+.step .q{font-size:13px;color:var(--muted)}
+.step .fx{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px dashed var(--line);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere}
+.step .out{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--action)}
+.step:nth-child(4) .out{color:var(--fg)}
+.step .out small{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.howto{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;background:var(--info-bg);border-radius:8px;padding:10px 12px;font-size:13.5px;margin:0 0 14px}
+.howto .k{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--action);padding-top:2px;white-space:nowrap}
+.howto p{margin:0}
+/* medidor de utilização */
+.meter{position:relative;height:10px;border-radius:999px;background:var(--grid);margin-top:6px;overflow:visible}
+.meter span{position:absolute;inset:0 auto 0 0;border-radius:999px;background:var(--crit)}
+.meter.okm span{background:var(--ok)}
+.meter i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--fg);opacity:.6}
+.meter-l{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+/* barras horizontais */
+.bars{display:grid;gap:10px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 110px;gap:10px;align-items:center;font-size:13.5px}
+@media (max-width:560px){.bar{grid-template-columns:92px minmax(0,1fr) 84px;font-size:12.5px}}
+.bar .track{height:22px;background:var(--grid);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;border-radius:4px;background:var(--action)}
+.bar .fill.y{background:var(--brand)} .bar .fill.g{background:var(--muted)} .bar .fill.r{background:var(--crit)} .bar .fill.ok{background:var(--ok)}
+.bar .val{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.bar .lab b{display:block}
+.bar .lab small{color:var(--muted);font-size:11.5px}
+.subh{font-size:13px;font-weight:800;margin:14px 0 8px;color:var(--fg)}
+.timeline{overflow-x:auto}
+.timeline svg{display:block;width:100%;min-width:700px;height:auto}
+footer.wrap{padding-block:0 32px;color:var(--muted);font-size:12.5px}
+footer p{margin:0;max-width:90ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="band">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Case S&amp;OP · Planejamento de Veículos</div>
+      <h1>Simulador de capacidade de frota</h1>
+      <p>Demanda, capacidade e custo em 24 meses, com alertas de lead time e validação do forecast. Abre com as premissas do case; mude qualquer número para ver o efeito.</p>
+    </div>
+    <div style="display:grid;gap:8px;justify-items:end">
+      <div class="seal"><div class="mono" aria-hidden="true">MP</div><div class="who"><b>Millena Machado Piccolo</b>Analista Sr de Planejamento de Veículos</div></div>
+      <div class="today" id="todayLbl"></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <aside class="panel" aria-label="Premissas">
+    <h2>Premissas</h2>
+    <fieldset>
+      <legend>Demanda</legend>
+      <div class="f"><label for="v0">Volume médio hoje<small>pacotes/dia</small></label><input id="v0" type="number" step="1000"></div>
+      <div class="f"><label for="g1">Crescimento ano 1<small>%</small></label><input id="g1" type="number" step="1"></div>
+      <div class="f"><label for="g2">Crescimento ano 2<small>%</small></label><input id="g2" type="number" step="1"></div>
+      <div class="f"><label for="pf">Fator de peak<small>× volume do dia a dia</small></label><input id="pf" type="number" step="0.05"></div>
+      <div class="f"><label for="pw">Duração do peak<small>semanas</small></label><input id="pw" type="number" step="1"></div>
+      <div class="f"><label for="hoje">Data de hoje</label><input id="hoje" type="date"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Capacidade</legend>
+      <div class="f"><label for="ut">Utilização-alvo dia a dia<small>%</small></label><input id="ut" type="number" step="1"></div>
+      <div class="f"><label for="up">Utilização no peak<small>% · o case não define</small></label><input id="up" type="number" step="1"></div>
+      <div class="f"><label for="lt">Lead time dedicada<small>meses</small></label><input id="lt" type="number" step="1"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Frota atual</legend>
+      <div class="fleet">
+        <span></span><span class="h">Frota</span><span class="h">SPR</span><span class="h">R$/mês</span>
+        <b>Carro</b><input id="nC" type="number" aria-label="Frota de carros"><input id="sC" type="number" aria-label="SPR carro"><input id="cC" type="number" step="100" aria-label="Custo mensal carro">
+        <b>Van</b><input id="nV" type="number" aria-label="Frota de vans"><input id="sV" type="number" aria-label="SPR van"><input id="cV" type="number" step="100" aria-label="Custo mensal van">
+        <b>VUC</b><input id="nU" type="number" aria-label="Frota de VUCs"><input id="sU" type="number" aria-label="SPR VUC"><input id="cU" type="number" step="100" aria-label="Custo mensal VUC">
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Spot e contrato</legend>
+      <div class="f"><label for="sp">Prêmio do spot<small>% sobre a diária dedicada</small></label><input id="sp" type="number" step="1"></div>
+      <div class="f"><label for="cm">Prazo mínimo do contrato<small>meses · dado a confirmar</small></label><input id="cm" type="number" step="1"></div>
+      <div class="f"><label for="fr">Fill rate do spot<small>% do pedido que aparece</small></label><input id="fr" type="number" step="1"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Mix do crescimento</legend>
+      <div class="f"><label for="mU">VUC<small>% da capacidade nova</small></label><input id="mU" type="number" step="5"></div>
+      <div class="f"><label for="mV">Van<small>%</small></label><input id="mV" type="number" step="5"></div>
+      <div class="f"><label for="mC">Carro<small>%</small></label><input id="mC" type="number" step="5"></div>
+      <div class="mixsum" id="mixsum"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Forecast</legend>
+      <div class="f"><label for="tol">Tolerância de desvio<small>% · gera alerta acima disso</small></label><input id="tol" type="number" step="1"></div>
+    </fieldset>
+    <button class="btn-primary" id="reset" type="button">Voltar aos números do case</button>
+  </aside>
+
+  <div class="content">
+    <section class="panel">
+      <h2>Como o simulador pensa</h2>
+      <p class="lead">Quatro perguntas em sequência levam da demanda até a decisão de contratação. Os valores abaixo mudam com as premissas.</p>
+      <div class="flow" id="flow"></div>
+    </section>
+
+    <div class="kpis" id="kpis"></div>
+
+    <section class="panel">
+      <h2>Alertas e decisões</h2>
+      <div class="howto"><span class="k">Como ler</span><p>Vermelho pede ação imediata, amarelo tem prazo, azul é informação para o ritual mensal. Cada capacidade é decidida no último momento em que ainda chega a tempo: data da necessidade menos o lead time.</p></div>
+      <div class="alerts" id="alerts"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Linha do tempo das decisões</h2>
+      <div class="howto"><span class="k">Como ler</span><p>Os marcadores de cima são decisões; os de baixo são os momentos em que a frota precisa existir. A distância entre os dois é o lead time.</p></div>
+      <div class="timeline" id="timeline"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Curva de capacidade em 24 meses</h2>
+      <div class="howto"><span class="k">Como ler</span><p>A linha azul é a frota que a operação precisa a cada mês. Tudo o que fica acima da linha tracejada é capacidade que ainda não existe. Os pontos vermelhos são os peaks de Black Friday; a faixa amarela é o período em que nada contratado hoje chega a tempo.</p></div>
+      <div class="chart" id="chart"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Capacidade e veículos por cenário</h2>
+      <div class="howto"><span class="k">Como ler</span><p id="capLead"></p></div>
+      <div class="subh">Quanto falta em relação à frota de hoje (pacotes/dia)</div>
+      <div class="bars" id="capBars"></div>
+      <div class="subh">Detalhe em veículos</div>
+      <div class="tbl"><table id="tCap"></table></div>
+    </section>
+
+    <section class="panel">
+      <h2>Peak: dedicada ou spot</h2>
+      <div class="howto"><span class="k">Como ler</span><p>O spot é mais barato por dia, mas não garante que os veículos apareçam. A dedicada custa um pouco mais e garante. A pergunta é quanto vale essa garantia.</p></div>
+      <div class="subh">Custo de um VUC durante o peak</div>
+      <div class="bars" id="peakBars"></div>
+      <div class="grid2" id="peakBoxes" style="margin-top:16px"></div>
+      <div class="verdict" id="peakVerdict"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Mix de veículos no fim do ano 2</h2>
+      <div class="howto"><span class="k">Como ler</span><p id="mixLead"></p></div>
+      <div class="subh">Custo por pacote entregue</div>
+      <div class="bars" id="cppBars"></div>
+      <div class="subh">Custo mensal da frota em cada cenário</div>
+      <div class="bars" id="mixBars"></div>
+      <div class="subh">Detalhe</div>
+      <div class="tbl"><table id="tMix"></table></div>
+    </section>
+
+    <section class="panel">
+      <h2>Validação do forecast</h2>
+      <div class="howto"><span class="k">Como ler</span><p>O modelo projeta a demanda com o crescimento do case. O forecast é o número do time de demanda. Se os dois se afastam mais que a tolerância, a frota não deve ser travada antes de entender a diferença. <span class="tag-ex">Forecast de exemplo, com dados fictícios.</span> Edite qualquer mês para simular o forecast real.</p></div>
+      <div class="tbl"><table id="tFc"></table></div>
+    </section>
+  </div>
+</main>
+
+<footer class="wrap">
+  <p>Ferramenta de apoio ao case de Millena Machado Piccolo para o processo seletivo de Analista Sr de Planejamento de Veículos (S&amp;OP). Não é uma ferramenta oficial do Mercado Livre. Construída com apoio de IA; as fórmulas seguem as premissas P1 a P12 da resolução do case.</p>
+</footer>
+
+<script>
+(function(){
+const DEF={v0:100000,g1:25,g2:20,pf:1.4,pw:6,hoje:"2026-10-22",ut:90,up:98,lt:4,
+  nC:400,sC:80,cC:6500,nV:150,sV:150,cV:9500,nU:200,sU:220,cU:13000,
+  sp:35,cm:2,fr:95,mU:60,mV:40,mC:0,tol:5};
+// desvios fictícios do forecast de exemplo, mês 1 a 24
+const FC_DEV=[.012,-.018,.009,.021,-.006,.014,.031,.008,-.024,.017,.038,.072,-.011,.019,.006,-.041,.013,.022,-.009,.064,.015,-.007,.026,.011];
+const ids=Object.keys(DEF);
+const $=id=>document.getElementById(id);
+let fcOverrides={};
+
+const nf=(x,d=0)=>Number(x).toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const brl=x=>"R$ "+nf(x,0);
+const mi=x=>"R$ "+nf(x/1e6,2)+" mi";
+const pct=(x,d=1)=>nf(x*100,d)+"%";
+const MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const parseD=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(Date.UTC(y,m-1,d));};
+const fmtD=d=>String(d.getUTCDate()).padStart(2,"0")+"/"+String(d.getUTCMonth()+1).padStart(2,"0")+"/"+d.getUTCFullYear();
+const addM=(d,m)=>{const x=new Date(d);x.setUTCMonth(x.getUTCMonth()+m);return x;};
+const monLbl=d=>MES[d.getUTCMonth()]+"/"+String(d.getUTCFullYear()).slice(2);
+const days=(a,b)=>Math.round((b-a)/864e5);
+function blackFriday(y){const d=new Date(Date.UTC(y,10,1));const wd=d.getUTCDay();const firstThu=1+((4-wd+7)%7);return new Date(Date.UTC(y,10,firstThu+21+1));}
+
+function read(){const p={};ids.forEach(k=>{const el=$(k);p[k]=k==="hoje"?(el.value||DEF.hoje):(parseFloat(el.value));if(k!=="hoje"&&!isFinite(p[k]))p[k]=DEF[k];el.classList.toggle("chg",String(p[k])!==String(DEF[k]));});return p;}
+
+function model(p){
+  const T=[{k:"C",n:"Carro",fleet:p.nC,spr:p.sC,c:p.cC},{k:"V",n:"Van",fleet:p.nV,spr:p.sV,c:p.cV},{k:"U",n:"VUC",fleet:p.nU,spr:p.sU,c:p.cU}];
+  const share={C:p.mC/100,V:p.mV/100,U:p.mU/100};
+  const g1=p.g1/100,g2=p.g2/100,ut=p.ut/100,up=p.up/100;
+  const cap0=T.reduce((s,t)=>s+t.fleet*t.spr,0);
+  const V1=p.v0*(1+g1),V2=V1*(1+g2);
+  const vol=m=>m<=12?p.v0*Math.pow(1+g1,m/12):V1*Math.pow(1+g2,(m-12)/12);
+  const need=v=>v/ut, peakNeed=v=>v*p.pf/up;
+  const hoje=parseD(p.hoje);
+  const pdays=p.pw*7;
+  // Black Fridays
+  let y=hoje.getUTCFullYear(); if(blackFriday(y)<=hoje) y++;
+  const BF=[0,1,2].map(i=>blackFriday(y+i));
+  const mBF=BF.map(d=>days(hoje,d)/30);
+  // peak atual (BF0) no volume do dia; peaks dos anos 1 e 2 no volume do fim do ano (P4)
+  const pk0Vol=vol(mBF[0]), pk0Cap=peakNeed(pk0Vol), pk0Gap=Math.max(0,pk0Cap-cap0);
+  const c0=need(p.v0), cap1=need(V1), cap2=need(V2), pk1=peakNeed(V1), pk2=peakNeed(V2);
+  const layer1=pk1-cap1, layer2=pk2-cap2;
+  // dedicada a contratar hoje
+  const mLT=p.lt, volLT=vol(mLT), capLT=need(volLT), dedHoje=Math.max(0,capLT-cap0);
+  const defHoje=Math.max(0,c0-cap0), growthLT=Math.max(0,capLT-Math.max(c0,cap0));
+  const steps=[];for(let m=mLT;m<12;m++)steps.push(need(vol(m+1))-need(vol(m)));
+  const physNow=p.v0-cap0, physLT=volLT-cap0;
+  // spot
+  const spotPkg=T.map(t=>t.c/30*(1+p.sp/100)/t.spr);
+  const sMin=Math.min(...spotPkg), sMax=Math.max(...spotPkg);
+  const U=T[2];
+  const spotVeh=U.c/30*(1+p.sp/100)*pdays, dedVeh=U.c*p.cm, diff=dedVeh/spotVeh-1, beM=spotVeh/U.c;
+  const retain=Math.max(0,Math.min(layer1,need(V1*Math.pow(1+g2,beM/12))-cap1));
+  const vehLayer=Math.ceil(layer1/U.spr);
+  const premium=vehLayer*(dedVeh-spotVeh);
+  const unserved=layer1*(1-p.fr/100)*pdays;
+  const bePkg=unserved>0?premium/unserved:Infinity;
+  const fullDed=T.map(t=>layer1*(t.c/t.spr)*p.cm), fullSpot=spotPkg.map(s=>layer1*pdays*s);
+  // mix
+  const cpp=T.map(t=>t.c/30/(t.spr*ut));
+  const beOcc=(U.c/U.spr)/(T[0].c/T[0].spr/ut);
+  const vehFor=gap=>T.map(t=>share[t.k]>0?Math.ceil(Math.max(0,gap)*share[t.k]/t.spr):0);
+  const gap2=cap2-cap0;
+  const scen=[];
+  T.forEach((t,i)=>{const add=Math.ceil(Math.max(0,gap2)/t.spr);const f=T.map((u,j)=>u.fleet+(j===i?add:0));scen.push({n:"Crescer só com "+(t.n==="VUC"?"VUC":t.n.toLowerCase()),f});});
+  const sc=cap2/cap0; scen.push({n:"Crescer no mix atual",f:T.map(t=>Math.ceil(t.fleet*sc)),base:true});
+  const rv=vehFor(gap2); scen.push({n:"Mix escolhido ("+[["U","VUC"],["V","van"],["C","carro"]].filter(a=>share[a[0]]>0).map(a=>Math.round(share[a[0]]*100)+"% "+a[1]).join(" / ")+")",f:T.map((t,i)=>t.fleet+rv[i]),rec:true});
+  scen.forEach(s=>{s.cap=s.f.reduce((a,n,i)=>a+n*T[i].spr,0);s.cost=s.f.reduce((a,n,i)=>a+n*T[i].c,0);});
+  const base=scen.find(s=>s.base).cost; scen.forEach(s=>s.save=(base-s.cost)*12);
+  // forecast
+  const fc=[];for(let m=1;m<=24;m++){const mv=vol(m);const f=fcOverrides[m]!=null?fcOverrides[m]:Math.round(mv*(1+FC_DEV[m-1])/100)*100;fc.push({m,date:addM(hoje,m),model:mv,fc:f,dev:f/mv-1});}
+  return {p,T,share,cap0,V1,V2,vol,need,peakNeed,hoje,pdays,BF,mBF,pk0Vol,pk0Cap,pk0Gap,c0,cap1,cap2,pk1,pk2,layer1,layer2,
+    mLT,volLT,capLT,dedHoje,defHoje,growthLT,steps,physNow,physLT,spotPkg,sMin,sMax,spotVeh,dedVeh,diff,beM,retain,vehLayer,premium,unserved,bePkg,
+    fullDed,fullSpot,cpp,beOcc,vehFor,gap2,scen,fc,util0:p.v0/cap0,ut,up,mixOk:Math.abs(p.mU+p.mV+p.mC-100)<0.01};
+}
+
+function vehTxt(M,gap){const v=M.vehFor(gap);const parts=[];[[2,"VUCs"],[1,"vans"],[0,"carros"]].forEach(([i,n])=>{if(v[i]>0)parts.push(nf(v[i])+" "+n);});return parts.join(" + ")||"—";}
+
+function render(){
+  const p=read(); const M=model(p);
+  $("todayLbl").textContent="Hoje: "+fmtD(M.hoje);
+  const ms=$("mixsum"); const tot=p.mU+p.mV+p.mC; ms.textContent="Soma do mix: "+nf(tot)+"%"+(M.mixOk?"":" · ajuste para 100%"); ms.classList.toggle("bad",!M.mixOk);
+
+  // KPIs
+  const k=[
+    {l:"Utilização da frota hoje",v:pct(M.util0),s:nf(M.cap0)+" pacotes/dia de capacidade",crit:M.util0>1},
+    {l:"Capacidade dia a dia · ano 1",v:nf(M.cap1),s:"ano 2: "+nf(M.cap2)+" pacotes/dia"},
+    {l:"Capacidade no peak · ano 1",v:nf(M.pk1),s:"ano 2: "+nf(M.pk2)+" pacotes/dia"},
+    {l:"Dedicada a contratar hoje",v:nf(M.dedHoje),s:"pacotes/dia para "+monLbl(addM(M.hoje,M.mLT))+" · "+vehTxt(M,M.dedHoje)}
+  ];
+  const um=Math.min(M.util0,1.2)/1.2*100, ut=M.ut/1.2*100;
+  k[0].extra=`<div class="meter${M.util0<=M.ut?" okm":""}"><span style="width:${um}%"></span><i style="left:${ut}%" title="meta"></i><i style="left:${100/1.2}%" title="100%"></i></div><div class="meter-l"><span>0%</span><span>meta ${nf(p.ut)}% · 100%</span><span>120%</span></div>`;
+  $("kpis").innerHTML=k.map(x=>`<div class="kpi${x.crit?" crit":""}"><span class="l">${x.l}</span><span class="v">${x.v}</span><span class="s">${x.s}</span>${x.extra||""}</div>`).join("");
+
+  // Fluxo didático
+  const dLT=monLbl(addM(M.hoje,M.mLT));
+  const F=[
+    {h:"Demanda",q:"Quantos pacotes por dia vamos ter?",fx:`${nf(p.v0)} × (1 + ${nf(p.g1)}%)`,o:nf(M.V1),s:"pacotes/dia no fim do ano 1"},
+    {h:"Capacidade",q:"Quanta frota isso exige com folga?",fx:`${nf(M.V1)} ÷ ${nf(p.ut)}%`,o:nf(M.cap1),s:"pacotes/dia de capacidade"},
+    {h:"Veículos",q:"Quantos veículos novos cobrem a diferença?",fx:`(${nf(M.cap1)} − ${nf(M.cap0)}) ÷ pacotes por rota`,o:nf(M.vehFor(M.cap1-M.cap0).reduce((a,b)=>a+b,0)),s:vehTxt(M,M.cap1-M.cap0)},
+    {h:"Decisão",q:"O que precisa ser contratado hoje?",fx:`necessidade de ${dLT} − frota de hoje`,o:nf(M.dedHoje),s:"pacotes/dia de dedicada, chegam em "+dLT}
+  ];
+  $("flow").innerHTML=F.map((f,i)=>`<div class="step"><span class="n">${i+1}</span><h3>${f.h}</h3><span class="q">${f.q}</span><span class="fx">${f.fx}</span><span class="out">${f.o}<small>${f.s}</small></span></div>`).join("");
+
+  // Barras genéricas
+  const barsHTML=(items,fmt)=>{const mx=Math.max(...items.map(i=>Math.abs(i.v)),1);return items.map(i=>`<div class="bar"><span class="lab"><b>${i.l}</b>${i.s?`<small>${i.s}</small>`:""}</span><div class="track"><div class="fill ${i.c||""}" style="width:${Math.max(1.5,Math.abs(i.v)/mx*100)}%"></div></div><span class="val">${fmt(i.v)}</span></div>`).join("");};
+  $("capBars").innerHTML=barsHTML([
+    {l:"Hoje",s:"só para voltar a 90%",v:M.c0-M.cap0,c:"r"},
+    {l:"Ano 1 · dia a dia",v:M.cap1-M.cap0},
+    {l:"Ano 1 · peak",v:M.pk1-M.cap0,c:"y"},
+    {l:"Ano 2 · dia a dia",v:M.cap2-M.cap0},
+    {l:"Ano 2 · peak",v:M.pk2-M.cap0,c:"y"}],v=>nf(v));
+  $("peakBars").innerHTML=barsHTML([
+    {l:"Spot",s:`${nf(M.pdays)} dias, sem garantia`,v:M.spotVeh,c:"g"},
+    {l:"Dedicada",s:`${nf(p.cm)} ${p.cm===1?"mês":"meses"}, garantida`,v:M.dedVeh}],v=>brl(v));
+  $("cppBars").innerHTML=barsHTML([
+    {l:"VUC",s:nf(p.sU)+" pacotes por rota",v:M.cpp[2],c:"ok"},
+    {l:"Van",s:nf(p.sV)+" pacotes por rota",v:M.cpp[1]},
+    {l:"Carro",s:nf(p.sC)+" pacotes por rota",v:M.cpp[0],c:"g"}].sort((a,b)=>a.v-b.v),v=>"R$ "+nf(v,2));
+  $("mixBars").innerHTML=barsHTML([...M.scen].sort((a,b)=>a.cost-b.cost).map(s=>({l:s.n.replace("Crescer ",""),s:s.base?"referência":(s.save>=0?"economiza ":"custa mais ")+mi(Math.abs(s.save))+"/ano",v:s.cost,c:s.rec?"y":s.base?"g":""})),v=>mi(v));
+
+  drawTimeline(M);
+
+  // Alertas
+  const A=[];
+  if(M.util0>1)A.push(["crit","Frota acima de 100%",`A frota roda a ${pct(M.util0)}: faltam ${nf(M.physNow)} pacotes/dia mesmo com 100% de uso, e ${nf(M.physLT)} em ${monLbl(addM(M.hoje,M.mLT))}. Cobrir com segunda onda de rotas, horas estendidas ou spot pontual.`,"Agora"]);
+  const bfDays=days(M.hoje,M.BF[0]);
+  if(M.mBF[0]<M.mLT&&M.pk0Gap>0)A.push(["crit","Peak dentro do lead time",`Black Friday em ${bfDays} dias: a dedicada não chega a tempo. Garantir ${nf(M.pk0Gap)} pacotes/dia de spot (~${nf(Math.ceil(M.pk0Gap/p.sU))} VUCs ou ~${nf(Math.ceil(M.pk0Gap/p.sC))} carros), de ${mi(M.pk0Gap*M.pdays*M.sMin)} a ${mi(M.pk0Gap*M.pdays*M.sMax)}, com fornecedores redundantes e plano B.`,"BF "+fmtD(M.BF[0])]);
+  if(M.dedHoje>0)A.push(["warn","Decisão vence hoje",`Contratar ${nf(M.dedHoje)} pacotes/dia de dedicada (${vehTxt(M,M.dedHoje)}) para ${monLbl(addM(M.hoje,M.mLT))}: ${nf(M.defHoje)} do déficit atual e ${nf(M.growthLT)} de crescimento.`,fmtD(M.hoje)]);
+  const pkStart=new Date(Date.UTC(M.BF[1].getUTCFullYear(),M.BF[1].getUTCMonth(),1));
+  const pkDecide=addM(pkStart,-M.mLT);
+  A.push(["warn","Contrato do próximo peak",`Fechar a camada sazonal da Black Friday ${M.BF[1].getUTCFullYear()} (${nf(M.layer1)} pacotes/dia, ~${nf(M.vehLayer)} VUCs) até ${fmtD(pkDecide)}. Antes disso, confirmar o prazo mínimo do contrato com as transportadoras.`,"Até "+fmtD(pkDecide)]);
+  if(M.steps.length)A.push(["info","Ritual mensal m+"+M.mLT,`A cada mês, aprovar de ${nf(Math.min(...M.steps))} a ${nf(Math.max(...M.steps))} pacotes/dia a mais de dedicada para o mês ${M.mLT} meses à frente.`,"Mensal"]);
+  if(M.diff>0.15)A.push(["warn","Contrato mínimo longo",`Com ${nf(p.cm)} meses de contrato, a dedicada custa ${pct(M.diff)} a mais que o spot no peak. Acima de ${nf(M.beM,2)} mês, a camada sazonal tende a voltar para o spot.`,"Peak"]);
+  if(M.up>M.ut){const extra=M.V1*p.pf/M.ut-M.pk1;A.push(["info","Sensibilidade do peak",`Rodar o peak a ${nf(p.ut)}% em vez de ${nf(p.up)}% exige mais ${nf(extra)} pacotes/dia no ano 1 (~${nf(Math.ceil(extra/p.sU))} VUCs).`,"Premissa"]);}
+  const fcBad=M.fc.filter(f=>Math.abs(f.dev)>p.tol/100);
+  if(fcBad.length)A.push(["warn","Forecast fora da tolerância",`${fcBad.length} ${fcBad.length===1?"mês":"meses"} com desvio acima de ±${nf(p.tol)}% entre o forecast e o modelo: ${fcBad.map(f=>monLbl(f.date)+" ("+(f.dev>0?"+":"")+pct(f.dev)+")").join(", ")}. Revisar com Planejamento de Demanda antes de travar frota.`,"Forecast"]);
+  else A.push(["ok","Forecast alinhado",`Todos os meses estão dentro de ±${nf(p.tol)}% do modelo.`,"Forecast"]);
+  if(!M.mixOk)A.push(["crit","Mix inválido","A soma do mix de crescimento precisa ser 100%.","Premissa"]);
+  const tagName={crit:"Crítico",warn:"Atenção",info:"Info",ok:"OK"};
+  $("alerts").innerHTML=A.map(a=>`<div class="alert ${a[0]}"><span class="tag">${tagName[a[0]]}</span><div><b>${a[1]}</b><span class="when">${a[3]}</span>${a[2]}</div></div>`).join("");
+
+  drawChart(M);
+
+  // Tabela capacidade
+  $("capLead").textContent=`Capacidade em pacotes/dia e veículos adicionais no mix escolhido. Volume de cada ano é o do fim do ano (P3); peak sobre a base do fim do ano a ${nf(p.up)}% (P4, P5).`;
+  const rows=[
+    ["Hoje",p.v0,M.c0],["Ano 1 · dia a dia",M.V1,M.cap1],["Ano 1 · peak",M.V1*p.pf,M.pk1],["Ano 2 · dia a dia",M.V2,M.cap2],["Ano 2 · peak",M.V2*p.pf,M.pk2]];
+  $("tCap").innerHTML=`<thead><tr><th>Cenário</th><th class="n">Volume</th><th class="n">Capacidade necessária</th><th class="n">Falta vs. hoje</th><th>Veículos adicionais</th></tr></thead><tbody>`+
+    rows.map(r=>{const gap=r[2]-M.cap0;return `<tr><td>${r[0]}</td><td class="n">${nf(r[1])}</td><td class="n">${nf(r[2])}</td><td class="n">${nf(gap)}</td><td>${vehTxt(M,gap)}</td></tr>`;}).join("")+
+    `<tr><td>Camada sazonal · ano 1</td><td class="n">—</td><td class="n">${nf(M.layer1)}</td><td class="n">—</td><td>${vehTxt(M,M.layer1)}</td></tr><tr><td>Camada sazonal · ano 2</td><td class="n">—</td><td class="n">${nf(M.layer2)}</td><td class="n">—</td><td>${vehTxt(M,M.layer2)}</td></tr></tbody>`;
+
+  // Peak
+  $("peakBoxes").innerHTML=`
+   <div class="box"><h3>Um VUC no peak</h3>
+    <div class="row"><span>Diária do spot</span><span>${brl(p.cU/30*(1+p.sp/100))}</span></div>
+    <div class="row"><span>Spot por ${nf(M.pdays)} dias</span><span>${brl(M.spotVeh)}</span></div>
+    <div class="row"><span>Dedicada por ${nf(p.cm)} ${p.cm===1?"mês":"meses"}</span><span>${brl(M.dedVeh)}</span></div>
+    <div class="row"><span>Dedicada vs. spot</span><span>${M.diff>=0?"+":""}${pct(M.diff)}</span></div>
+    <div class="row"><span>Ponto de empate do contrato</span><span>${nf(M.beM,2)} mês</span></div></div>
+   <div class="box"><h3>Camada sazonal do ano 1</h3>
+    <div class="row"><span>Volume da camada</span><span>${nf(M.layer1)} pacotes/dia</span></div>
+    <div class="row"><span>Fica após o peak</span><span>${nf(M.retain)}</span></div>
+    <div class="row"><span>Custo cheio em dedicada</span><span>${mi(Math.min(...M.fullDed))} a ${mi(Math.max(...M.fullDed))}</span></div>
+    <div class="row"><span>Mesma camada em spot</span><span>${mi(Math.min(...M.fullSpot))} a ${mi(Math.max(...M.fullSpot))}</span></div>
+    <div class="row"><span>Prêmio da garantia (${nf(M.vehLayer)} VUCs)</span><span>${brl(M.premium)}</span></div>
+    <div class="row"><span>Não entregues se o spot vier a ${nf(p.fr)}%</span><span>${nf(M.unserved)} pacotes</span></div></div>`;
+  $("peakVerdict").textContent=isFinite(M.bePkg)
+    ?`A dedicada compensa se o custo de não entregar um pacote passar de ${"R$ "+nf(M.bePkg,2)}. Regra: dedicada até o P50–P70 do forecast de peak, spot para a cauda.`
+    :`Com fill rate de 100%, o spot nunca falha e a garantia não tem valor: a camada vai para o spot.`;
+
+  // Mix
+  $("mixLead").innerHTML=`Custo por pacote entregue a ${nf(p.ut)}%: VUC ${"R$ "+nf(M.cpp[2],2)}, van ${"R$ "+nf(M.cpp[1],2)}, carro ${"R$ "+nf(M.cpp[0],2)}. O VUC empata com o carro mesmo rodando a ${pct(M.beOcc)} de ocupação.`;
+  const sorted=[...M.scen].sort((a,b)=>a.cost-b.cost);
+  $("tMix").innerHTML=`<thead><tr><th>Cenário</th><th>Frota final</th><th class="n">Capacidade</th><th class="n">Custo mensal</th><th class="n">Economia vs. mix atual</th></tr></thead><tbody>`+
+    sorted.map(s=>`<tr class="${s.rec?"hl":""}"><td>${s.n}</td><td>${nf(s.f[0])} carros · ${nf(s.f[1])} vans · ${nf(s.f[2])} VUCs</td><td class="n">${nf(s.cap)}</td><td class="n">${brl(s.cost)}</td><td class="n">${s.base?"—":(s.save>=0?"":"−")+brl(Math.abs(s.save)).replace("R$ ","R$ ")+"/ano"}</td></tr>`).join("")+`</tbody>`;
+
+  // Forecast
+  $("tFc").innerHTML=`<thead><tr><th>Mês</th><th class="n">Modelo (pacotes/dia)</th><th class="n">Forecast</th><th class="n">Desvio</th><th class="n">Impacto em capacidade</th><th>Status</th></tr></thead><tbody>`+
+    M.fc.map(f=>{const bad=Math.abs(f.dev)>p.tol/100;const near=!bad&&Math.abs(f.dev)>p.tol/200;const imp=(f.fc-f.model)/M.ut;
+      return `<tr><td>${monLbl(f.date)}</td><td class="n">${nf(f.model)}</td><td class="n"><input type="number" step="100" data-m="${f.m}" value="${Math.round(f.fc)}" aria-label="Forecast ${monLbl(f.date)}"></td><td class="n">${f.dev>0?"+":""}${pct(f.dev)}</td><td class="n">${imp>0?"+":""}${nf(imp)} (~${nf(Math.ceil(Math.abs(imp)/p.sU))} VUCs)</td><td><span class="pill ${bad?"crit":near?"warn":"ok"}">${bad?"Fora":near?"Atenção":"OK"}</span></td></tr>`;}).join("")+`</tbody>`;
+  $("tFc").querySelectorAll("input[data-m]").forEach(el=>el.addEventListener("change",e=>{const v=parseFloat(e.target.value);const m=+e.target.dataset.m;if(isFinite(v))fcOverrides[m]=v;else delete fcOverrides[m];render();}));
+}
+
+function drawChart(M){
+  const W=820,H=320,L=64,R=18,T=18,B=40;
+  const xMax=Math.ceil(Math.max(24,M.mBF[2]+0.5));
+  const pts=[];for(let m=0;m<=xMax;m+=0.25)pts.push([m,M.need(M.vol(m))]);
+  const fcPts=M.fc.map(f=>[f.m,f.fc/M.ut]);
+  const peaks=[[M.mBF[0],M.pk0Cap,"BF "+M.BF[0].getUTCFullYear()],[M.mBF[1],M.pk1,"BF "+M.BF[1].getUTCFullYear()],[M.mBF[2],M.pk2,"BF "+M.BF[2].getUTCFullYear()]];
+  const all=[...pts.map(p=>p[1]),...fcPts.map(p=>p[1]),...peaks.map(p=>p[1]),M.cap0];
+  const step=25000;const yMin=Math.floor(Math.min(...all)*0.9/step)*step;const yMax=Math.ceil(Math.max(...all)*1.05/step)*step;
+  const x=m=>L+(m/xMax)*(W-L-R), y=v=>T+(1-(v-yMin)/(yMax-yMin))*(H-T-B);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Curva de capacidade necessária em 24 meses">`;
+  s+=`<rect x="${x(0)}" y="${T}" width="${x(Math.min(M.mLT,xMax))-x(0)}" height="${H-T-B}" fill="var(--brand)" opacity=".18"/>`;
+  s+=`<text x="${x(0)+6}" y="${T+14}" font-size="11" fill="var(--muted)" font-family="var(--font)">dentro do lead time</text>`;
+  for(let v=yMin;v<=yMax;v+=step){s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--mono)">${nf(v/1000)} mil</text>`;}
+  for(let m=0;m<=xMax;m+=3){s+=`<text x="${x(m)}" y="${H-B+18}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--mono)">${monLbl(addM(M.hoje,m))}</text>`;}
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(M.cap0)}" y2="${y(M.cap0)}" stroke="var(--muted)" stroke-width="2" stroke-dasharray="6 5"/>`;
+  s+=`<text x="${W-R}" y="${y(M.cap0)+16}" text-anchor="end" font-size="11.5" fill="var(--muted)" font-family="var(--font)" font-weight="700">frota de hoje · ${nf(M.cap0)}</text>`;
+  const path=pts.map((p,i)=>(i?"L":"M")+x(p[0]).toFixed(1)+" "+y(p[1]).toFixed(1)).join(" ");
+  s+=`<path d="${path} L${x(xMax)} ${y(yMin)} L${x(0)} ${y(yMin)} Z" fill="var(--action)" opacity=".08"/>`;
+  s+=`<path d="${path}" fill="none" stroke="var(--action)" stroke-width="2.5"/>`;
+  s+=`<path d="${fcPts.map((p,i)=>(i?"L":"M")+x(p[0]).toFixed(1)+" "+y(p[1]).toFixed(1)).join(" ")}" fill="none" stroke="var(--warn)" stroke-width="1.8" stroke-dasharray="3 3"/>`;
+  M.fc.forEach(f=>{if(Math.abs(f.dev)>M.p.tol/100)s+=`<circle cx="${x(f.m)}" cy="${y(f.fc/M.ut)}" r="4" fill="var(--crit)"/>`;});
+  peaks.forEach(pk=>{if(pk[0]>xMax)return;s+=`<line x1="${x(pk[0])}" x2="${x(pk[0])}" y1="${y(M.need(M.vol(pk[0])))}" y2="${y(pk[1])}" stroke="var(--crit)" stroke-width="1.5"/><circle cx="${x(pk[0])}" cy="${y(pk[1])}" r="5" fill="var(--crit)"/><text x="${x(pk[0])}" y="${y(pk[1])-10}" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--fg)" font-family="var(--font)">${pk[2]} · ${nf(pk[1]/1000,1)} mil</text>`;});
+  s+=`<circle cx="${x(24)}" cy="${y(M.need(M.vol(24)))}" r="4.5" fill="var(--action)"/>`;
+  s+=`</svg>`;
+  $("chart").innerHTML=s;
+  $("legend").innerHTML=`<span><i style="background:var(--action)"></i>Capacidade necessária (dia a dia)</span><span><i style="background:var(--warn)"></i>Forecast ÷ utilização-alvo</span><span><i style="background:var(--muted)"></i>Frota de hoje</span><span><i style="background:var(--crit)"></i>Peak e meses fora da tolerância</span>`;
+}
+
+function drawTimeline(M){
+  const W=900,H=232,L=30,R=30,mid=96;
+  const end=addM(M.hoje,Math.ceil(M.mBF[2]+1));const span=days(M.hoje,end);
+  const x=d=>L+(days(M.hoje,d)/span)*(W-L-R);
+  const pkStart=new Date(Date.UTC(M.BF[1].getUTCFullYear(),M.BF[1].getUTCMonth(),1));
+  const ltD=addM(M.hoje,M.mLT);
+  const top=[[M.hoje,"Hoje","contratar dedicada + spot"],[addM(pkStart,-M.mLT),"Fechar sazonal","peak "+M.BF[1].getUTCFullYear()]];
+  const bot=[[M.BF[0],"BF "+M.BF[0].getUTCFullYear(),"só spot"],[ltD,"Dedicada chega",nf(M.dedHoje)+"/dia"],[M.BF[1],"BF "+M.BF[1].getUTCFullYear(),"camada sazonal"],[M.BF[2],"BF "+M.BF[2].getUTCFullYear(),"camada sazonal"]];
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Linha do tempo de decisões e peaks">`;
+  s+=`<rect x="${x(M.hoje)}" y="${mid-6}" width="${x(ltD)-x(M.hoje)}" height="12" rx="6" fill="var(--brand)" opacity=".55"/>`;
+  s+=`<line x1="${L}" x2="${W-R}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="3"/>`;
+  s+=`<text x="${(x(M.hoje)+x(ltD))/2}" y="${mid+4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2D3277" font-family="var(--font)">lead time ${nf(M.mLT)} meses</text>`;
+  for(let m=0;m<=Math.ceil(M.mBF[2]+1);m+=3){const d=addM(M.hoje,m);s+=`<text x="${x(d)}" y="${H-6}" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="var(--mono)">${monLbl(d)}</text><line x1="${x(d)}" x2="${x(d)}" y1="${mid-3}" y2="${mid+3}" stroke="var(--muted)"/>`;}
+  const lab=(d,a,b,up,dp=0)=>{const X=x(d),y0=up?mid-12:mid+12,y1=up?28:mid+46+dp*34,anchor=X<80?"start":X>W-80?"end":"middle";
+    return `<line x1="${X}" x2="${X}" y1="${y0}" y2="${up?y1+16:y1-10}" stroke="${up?"var(--action)":"var(--crit)"}" stroke-width="1.5"/><circle cx="${X}" cy="${mid}" r="6" fill="${up?"var(--action)":"var(--crit)"}" stroke="var(--surface)" stroke-width="2"/><text x="${X}" y="${up?y1:y1+4}" text-anchor="${anchor}" font-size="12" font-weight="800" fill="var(--fg)" font-family="var(--font)">${a}</text><text x="${X}" y="${(up?y1:y1+4)+14}" text-anchor="${anchor}" font-size="11" fill="var(--muted)" font-family="var(--font)">${fmtD(d)} · ${b}</text>`;};
+  top.forEach(t=>s+=lab(t[0],t[1],t[2],true));
+  bot.forEach((t,i)=>{s+=lab(t[0],t[1],t[2],false,i===1?1:0);});
+  s+=`</svg>`;
+  $("timeline").innerHTML=s;
+}
+
+function setDefaults(){ids.forEach(k=>{$(k).value=DEF[k];});fcOverrides={};}
+setDefaults();
+ids.forEach(k=>$(k).addEventListener("input",render));
+$("reset").addEventListener("click",()=>{setDefaults();render();});
+render();
+})();
+</script>
+
+</body>
+</html>
